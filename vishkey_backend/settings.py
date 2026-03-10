@@ -17,7 +17,7 @@ DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv(
     "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1,msafe-server.onrender.com"
+    "localhost,127.0.0.1,msafe-server.onrender.com,api.msafe.shop"
 ).split(",")
 
 # ───────── Installed apps ─────────
