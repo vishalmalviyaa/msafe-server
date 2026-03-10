@@ -1,0 +1,22 @@
+Django==5.0.6
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-filter==24.2
+
+psycopg2-binary==2.9.9
+
+boto3==1.34.158
+requests==2.32.3
+Pillow==10.3.0
+qrcode==7.4.2
+
+gunicorn==22.0.0
+python-dotenv==1.0.1
+whitenoise==6.6.0
+
+# Celery + Redis + Django integration for scalability_core
+celery==5.4.0
+redis==5.0.8
+django-redis==5.4.0
+django-celery-beat==2.6.0
+django-celery-results==2.5.1

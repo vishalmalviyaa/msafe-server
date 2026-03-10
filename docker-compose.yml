@@ -1,0 +1,125 @@
+# version: "3.9"
+
+# services:
+#   db:
+#     image: postgres:16
+#     container_name: vishkey_db
+#     restart: always
+#     environment:
+#       POSTGRES_DB: ${POSTGRES_DB}
+#       POSTGRES_USER: ${POSTGRES_USER}
+#       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+#     ports:
+#       - "5432:5432"
+
+#   redis:
+#     image: redis:7
+#     container_name: vishkey_redis
+#     restart: always
+#     ports:
+#       - "6379:6379"
+
+#   web:
+#     build: .
+#     container_name: vishkey_backend
+#     restart: always
+#     depends_on:
+#       - db
+#       - redis
+#     env_file:
+#       - .env
+#     ports:
+#       - "8000:8000"
+#     # If you want live code reload during development uncomment:
+#     # volumes:
+#     #   - .:/app
+
+#   celery_worker:
+#     build: .
+#     container_name: vishkey_celery
+#     restart: always
+#     depends_on:
+#       - db
+#       - redis
+#     env_file:
+#       - .env
+#     command: >
+#       celery -A vishkey_backend worker -l info
+
+#   celery_beat:
+#     build: .
+#     container_name: vishkey_celery_beat
+#     restart: always
+#     depends_on:
+#       - db
+#       - redis
+#     env_file:
+#       - .env
+#     command: >
+#       celery -A vishkey_backend beat -l info
+
+# volumes:
+#   postgres_data:
+services:
+  db:
+    image: postgres:16
+    container_name: vishkey_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    container_name: vishkey_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    container_name: vishkey_backend
+    restart: always
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    # web uses entrypoint.sh (migrations + static + gunicorn)
+    # entrypoint from Dockerfile is fine here
+
+  celery_worker:
+    build: .
+    container_name: vishkey_celery
+    restart: always
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    # IMPORTANT: override ENTRYPOINT to run Celery worker instead of entrypoint.sh
+    entrypoint: ["sh", "-c", "celery -A vishkey_backend worker -l info"]
+
+  celery_beat:
+    build: .
+    container_name: vishkey_celery_beat
+    restart: always
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    # IMPORTANT: override ENTRYPOINT to run Celery beat
+    entrypoint: ["sh", "-c", "celery -A vishkey_backend beat -l info"]
+
+volumes:
+  postgres_data:
