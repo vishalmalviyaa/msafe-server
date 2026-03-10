@@ -15,11 +15,16 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-key-change-me")
 
 DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = os.getenv(
-    "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1,msafe-server.onrender.com,api.msafe.shop"
-).split(",")
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "msafe-server.onrender.com",
+    "api.msafe.shop"
+]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://api.msafe.shop"
+]
 # ───────── Installed apps ─────────
 
 INSTALLED_APPS = [
