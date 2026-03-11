@@ -5,18 +5,21 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from .models import OwnerProfile
+
+from .models import OwnerProfile, OwnerDevice
+from .serializers import OwnerProfileSerializer
+
 from manager.models import ManagerProfile
+from manager.serializers import ManagerProfileSerializer
+
 from users.models import Customer, Device, AuditLog
 from users.serializers import CustomerSerializer
-from manager.serializers import ManagerProfileSerializer
-from .permissions import IsOwner
 from users.utils import send_fcm_to_owner
-from owner.models import OwnerDevice
-from .serializers import OwnerProfileSerializer
+
+from .permissions import IsOwner
+
 from scalability_core.models import DeviceRegistration, FcmCommand
 from scalability_core.tasks import send_fcm_command_task
-
 
 class OwnerCustomerViewSet(viewsets.ReadOnlyModelViewSet):
     """

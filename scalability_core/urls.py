@@ -13,16 +13,35 @@ app_name = "scalability_core"
 
 urlpatterns = [
 
-    path("health/", health),
+    path("health/", health, name="health"),
 
-    path("devices/register/", DeviceRegisterView.as_view()),
+    path(
+        "devices/register/",
+        DeviceRegisterView.as_view(),
+        name="device-register",
+    ),
 
-    path("devices/heartbeat/", DeviceHeartbeatView.as_view()),
+    path(
+        "devices/heartbeat/",
+        DeviceHeartbeatView.as_view(),
+        name="device-heartbeat",
+    ),
 
-    path("devices/location/", DeviceLocationPingView.as_view()),
+    path(
+        "devices/location/",
+        DeviceLocationPingView.as_view(),
+        name="device-location",
+    ),
 
-    path("devices/ack/", DeviceAckView.as_view()),
+    path(
+        "devices/ack/",
+        DeviceAckView.as_view(),
+        name="device-ack",
+    ),
 
-    path("uploads/presign/", PresignUploadView.as_view()),
-
+    path(
+        "uploads/presign/",
+        PresignUploadView.as_view(),
+        name="presign-upload",
+    ),
 ]

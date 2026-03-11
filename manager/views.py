@@ -380,3 +380,63 @@ class ManagerRegisterDeviceView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+from django.utils import timezone
+from datetime import timedelta
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from users.models import Customer
+from .permissions import IsManager
+
+
+class ManagerDeviceDashboardView(APIView):
+    """
+    Returns device dashboard data for manager app.
+    Shows device health, location, lock status.
+    """
+
+    permission_classes = [IsAuthenticated, IsManager]
+
+    def get(self, request):
+
+        manager_profile = request.user.manager_profile
+
+        customers = (
+            Customer.objects
+            .filter(manager=manager_profile, is_active=True)
+            .select_related("device")
+        )
+
+        devices = []
+        now = timezone.now()
+
+        for c in customers:
+
+            device = getattr(c, "device", None)
+
+            if not device:
+                continue
+
+            last_seen = device.last_seen
+            online = False
+
+            if last_seen:
+                online = now - last_seen < timedelta(minutes=2)
+
+            devices.append({
+                "customer_id": c.id,
+                "name": c.name,
+                "phone": c.phone,
+                "imei1": device.imei1,
+                "imei2": device.imei2,
+                "lock_status": device.lock_status,
+                "battery": getattr(device, "battery", None),
+                "online": online,
+                "last_seen": last_seen,
+                "latitude": getattr(device, "last_location_lat", None),
+                "longitude": getattr(device, "last_location_lng", None),
+            })
+
+        return Response({"devices": devices})
