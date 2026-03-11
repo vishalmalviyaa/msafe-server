@@ -107,26 +107,40 @@ class DeviceHeartbeatView(APIView):
     def post(self, request):
 
         device_id = request.data.get("device_id")
+        token = request.headers.get("X-DEVICE-TOKEN")
 
         try:
-            device = DeviceRegistration.objects.get(device_id=device_id)
+            device = DeviceRegistration.objects.get(
+                device_id=device_id,
+                device_token=token
+            )
         except DeviceRegistration.DoesNotExist:
             return Response(
-                {"error": "device not found"},
-                status=status.HTTP_404_NOT_FOUND,
+                {"error": "invalid device"},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         device.last_seen = timezone.now()
         device.last_ip = request.META.get("REMOTE_ADDR")
 
-        device.save(update_fields=["last_seen", "last_ip"])
+        device.battery_level = request.data.get("battery")
+        device.network_type = request.data.get("network")
+        device.android_version = request.data.get("android_version")
+        device.is_charging = request.data.get("charging")
+
+        device.save(
+            update_fields=[
+                "last_seen",
+                "last_ip",
+                "battery_level",
+                "network_type",
+                "android_version",
+                "is_charging",
+            ]
+        )
 
         return Response({"status": "ok"})
 
-
-# ---------------------------------------------------
-# LOCATION PING
-# ---------------------------------------------------
 
 class DeviceLocationPingView(APIView):
 
@@ -137,7 +151,22 @@ class DeviceLocationPingView(APIView):
         serializer = LocationPingSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        serializer.save()
+        ping = serializer.save()
+
+        # cache latest location on device for fast dashboard queries
+        device = ping.device
+
+        device.last_latitude = ping.latitude
+        device.last_longitude = ping.longitude
+        device.last_location_time = ping.captured_at
+
+        device.save(
+            update_fields=[
+                "last_latitude",
+                "last_longitude",
+                "last_location_time",
+            ]
+        )
 
         return Response({"ok": True})
 
