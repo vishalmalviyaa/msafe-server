@@ -233,3 +233,7 @@ LOGGING = {
         },
     },
 }
+CELERY_TASK_ROUTES = {
+    "scalability_core.tasks.send_fcm_command_task": {"queue": "commands"},
+    "scalability_core.tasks.reconcile_command_ack_task": {"queue": "acks"},
+}

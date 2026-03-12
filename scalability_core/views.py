@@ -1,7 +1,10 @@
 import os
 import uuid
+import secrets
 
+from django.core.cache import cache
 from django.utils import timezone
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -88,10 +91,16 @@ class DeviceRegisterView(APIView):
             },
         )
 
+        # generate token only once
+        if created:
+            obj.device_token = secrets.token_hex(32)
+            obj.save(update_fields=["device_token"])
+
         return Response(
             {
                 "registered": True,
-                "device_id": obj.id,
+                "device_id": obj.device_id,
+                "device_token": obj.device_token,
             }
         )
 
@@ -112,8 +121,9 @@ class DeviceHeartbeatView(APIView):
         try:
             device = DeviceRegistration.objects.get(
                 device_id=device_id,
-                device_token=token
+                device_token=token,
             )
+
         except DeviceRegistration.DoesNotExist:
             return Response(
                 {"error": "invalid device"},
@@ -121,12 +131,23 @@ class DeviceHeartbeatView(APIView):
             )
 
         device.last_seen = timezone.now()
+
+        # Redis online tracking
+        cache.set(
+            f"device_online:{device.device_id}",
+            True,
+            timeout=120,
+        )
+
         device.last_ip = request.META.get("REMOTE_ADDR")
 
-        device.battery_level = request.data.get("battery")
-        device.network_type = request.data.get("network")
-        device.android_version = request.data.get("android_version")
-        device.is_charging = request.data.get("charging")
+        device.battery_level = request.data.get("battery", device.battery_level)
+        device.network_type = request.data.get("network", device.network_type)
+        device.android_version = request.data.get(
+            "android_version",
+            device.android_version,
+        )
+        device.is_charging = request.data.get("charging", device.is_charging)
 
         device.save(
             update_fields=[
@@ -142,6 +163,10 @@ class DeviceHeartbeatView(APIView):
         return Response({"status": "ok"})
 
 
+# ---------------------------------------------------
+# DEVICE LOCATION PING
+# ---------------------------------------------------
+
 class DeviceLocationPingView(APIView):
 
     permission_classes = [AllowAny]
@@ -153,7 +178,6 @@ class DeviceLocationPingView(APIView):
 
         ping = serializer.save()
 
-        # cache latest location on device for fast dashboard queries
         device = ping.device
 
         device.last_latitude = ping.latitude
@@ -168,6 +192,17 @@ class DeviceLocationPingView(APIView):
             ]
         )
 
+        # Redis location cache
+        cache.set(
+            f"device_location:{device.device_id}",
+            {
+                "lat": float(ping.latitude),
+                "lng": float(ping.longitude),
+                "time": str(ping.captured_at),
+            },
+            timeout=600,
+        )
+
         return Response({"ok": True})
 
 
@@ -179,7 +214,7 @@ class DeviceAckView(APIView):
 
     permission_classes = [AllowAny]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
 
         serializer = CommandAckSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -191,14 +226,19 @@ class DeviceAckView(APIView):
         status_str = data["status"]
 
         try:
+
             if command_id:
+
                 command = FcmCommand.objects.select_related("device").get(
                     pk=command_id
                 )
+
             else:
+
                 command = FcmCommand.objects.select_related("device").get(
                     fcm_message_id=fcm_message_id
                 )
+
         except FcmCommand.DoesNotExist:
 
             return Response(
@@ -225,14 +265,14 @@ class PresignUploadView(APIView):
 
     permission_classes = [IsAuthenticated, IsOwnerOrManager]
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request):
 
         serializer = PresignUploadRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         return self._create_presign(serializer.validated_data)
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
 
         serializer = PresignUploadRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -254,6 +294,7 @@ class PresignUploadView(APIView):
         content_type = data["content_type"]
 
         ext = ""
+
         if "." in filename:
             ext = "." + filename.split(".")[-1]
 

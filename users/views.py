@@ -11,8 +11,8 @@ from .permissions import IsDPCClient
 from .utils import generate_s3_presigned_url, send_fcm_to_manager, send_fcm_to_owner, send_fcm
 
 from scalability_core.models import DeviceRegistration
-
-
+import secrets
+from django.core.cache import cache
 class DeviceHeartbeatView(APIView):
     """
     /api/dpc/heartbeat/
@@ -353,6 +353,8 @@ class DPCEnrollView(APIView):
 
         # Upsert into DeviceRegistration
         manager_profile = customer.manager
+
+
         dr, created = DeviceRegistration.objects.update_or_create(
             imei_1=device.imei1,
             defaults={
@@ -361,10 +363,12 @@ class DPCEnrollView(APIView):
                 "imei_2": device.imei2,
                 "device_id": data.get("device_id") or device.imei1,
                 "fcm_token": device.dpc_fcm_token or "",
+                "device_token": secrets.token_hex(32),
                 "last_seen": timezone.now(),
                 "is_active": True,
             },
         )
+
         device.device_registration = dr
         device.save(update_fields=["device_registration"])
 
