@@ -2,7 +2,7 @@ import secrets
 import qrcode
 from io import BytesIO
 from datetime import timedelta
-
+import json
 from django.http import HttpResponse
 from django.utils import timezone
 from django.core.cache import cache
@@ -40,6 +40,69 @@ class ManagerCustomerViewSet(viewsets.ModelViewSet):
 
     ordering_fields = ["created_at", "name"]
 
+
+    # -----------------------------------------------------
+    # QR PROVISIONING
+    # -----------------------------------------------------
+
+    @action(detail=True, methods=["get"])
+    def qr_png(self, request, pk=None):
+
+        customer = self.get_object()
+        device = getattr(customer, "device", None)
+
+        if not device:
+            return Response(
+                {"detail": "No device linked."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        manager_profile = request.user.manager_profile
+
+        token = (
+            EnrollmentToken.objects
+            .filter(customer=customer)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not token:
+            return Response(
+                {"detail": "Enrollment token not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        payload = {
+
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME":
+    "com.vashu.msafe.agent/.AdminReceiver",
+
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION":
+    "https://msafe.shop/download/msafe-agent.apk",
+
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM":
+    "BAAB5D65DE30674600CCFB2D28D2526C8B459885C76042D4857CD621602B7AFE",
+
+    "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
+
+        "token": token.token,
+        "manager_id": manager_profile.id,
+        "imei1": device.imei1
+    }
+}
+
+        qr = qrcode.make(json.dumps(payload))
+
+        buffer = BytesIO()
+        qr.save(buffer)
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type="image/png"
+        )  
+
+        response["Cache-Control"] = "no-store"
+        return response
 
     def get_queryset(self):
 
@@ -466,3 +529,57 @@ class ManagerDashboardView(APIView):
             )
 
         return Response(result)
+class ManagerDeviceMapView(APIView):
+
+    permission_classes = [IsAuthenticated, IsManager]
+
+    def get(self, request):
+
+        manager = request.user.manager_profile
+
+        devices = (
+            Device.objects
+            .filter(customer__manager=manager)
+            .select_related("customer", "device_registration")
+        )
+
+        results = []
+
+        for device in devices:
+
+            reg = device.device_registration
+
+            if not reg:
+                continue
+
+            loc = cache.get(f"device_location:{reg.device_id}")
+
+            if not loc:
+                continue
+
+            online = cache.get(f"device_online:{reg.device_id}") or False
+
+            results.append({
+                "imei": device.imei1,
+                "name": device.customer.name,
+                "phone": device.customer.phone,
+                "lat": loc["lat"],
+                "lng": loc["lng"],
+                "battery": reg.battery_level,
+                "online": online
+            })
+
+        return Response(results)
+from django.http import FileResponse
+import os
+from django.conf import settings
+
+
+def download_agent(request):
+
+    file_path = os.path.join(settings.BASE_DIR, "downloads", "msafe-agent.apk")
+
+    return FileResponse(
+        open(file_path, "rb"),
+        content_type="application/vnd.android.package-archive"
+    )
