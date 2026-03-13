@@ -570,16 +570,23 @@ class ManagerDeviceMapView(APIView):
             })
 
         return Response(results)
-from django.http import FileResponse
+from django.http import FileResponse, Http404
 import os
 from django.conf import settings
 
 
 def download_agent(request):
 
-    file_path = os.path.join(settings.BASE_DIR, "downloads", "msafe-agent.apk")
+    file_path = os.path.join(settings.BASE_DIR, "download", "msafe-agent.apk")
 
-    return FileResponse(
+    if not os.path.exists(file_path):
+        raise Http404("APK not found")
+
+    response = FileResponse(
         open(file_path, "rb"),
         content_type="application/vnd.android.package-archive"
     )
+
+    response["Content-Disposition"] = "attachment; filename=msafe-agent.apk"
+
+    return response
