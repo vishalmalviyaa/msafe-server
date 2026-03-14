@@ -78,7 +78,7 @@ class ManagerCustomerViewSet(viewsets.ModelViewSet):
     "com.vashu.msafe.agent/.AdminReceiver",
 
     "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION":
-    "https://msafe.shop/download/msafe-agent.apk",
+    "https://api.msafe.shop/api/manager/download/msafe-agent.apk",
 
     "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM":
     "BAAB5D65DE30674600CCFB2D28D2526C8B459885C76042D4857CD621602B7AFE",
@@ -571,19 +571,21 @@ class ManagerDeviceMapView(APIView):
 
         return Response(results)
 from django.http import FileResponse, Http404
-import os
 from django.conf import settings
+import os
 
 
 def download_agent(request):
 
     file_path = os.path.join(settings.BASE_DIR, "download", "msafe-agent.apk")
 
-    if not os.path.exists(file_path):
-        raise Http404("APK not found")
+    if not os.path.isfile(file_path):
+        raise Http404(f"APK not found at {file_path}")
+
+    file = open(file_path, "rb")
 
     response = FileResponse(
-        open(file_path, "rb"),
+        file,
         content_type="application/vnd.android.package-archive"
     )
 
