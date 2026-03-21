@@ -14,9 +14,12 @@ gunicorn==22.0.0
 python-dotenv==1.0.1
 whitenoise==6.6.0
 
-# Celery + Redis + Django integration for scalability_core
+# Celery + Redis
 celery==5.4.0
 redis==5.0.8
 django-redis==5.4.0
 django-celery-beat==2.6.0
 django-celery-results==2.5.1
+
+# Render database helper
+dj-database-url==2.2.0
