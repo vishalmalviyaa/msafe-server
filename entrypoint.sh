@@ -17,4 +17,10 @@ echo "🧹 Collecting static files..."
 python manage.py collectstatic --noinput || echo "No static files"
 
 echo "🚀 Starting Gunicorn..."
-gunicorn vishkey_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 3
+gunicorn vishkey_backend.wsgi:application \
+  --bind 0.0.0.0:$PORT \
+  --workers 2 \
+  --timeout 120 \
+  --log-level debug \
+  --access-logfile - \
+  --error-logfile -
