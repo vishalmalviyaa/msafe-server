@@ -24,6 +24,10 @@ from .permissions import IsManager
 
 from scalability_core.models import DeviceRegistration, FcmCommand
 from scalability_core.tasks import send_fcm_command_task
+from django.http import FileResponse, HttpResponse
+from django.conf import settings
+import os
+
 
 
 # =========================================================
@@ -575,20 +579,18 @@ from django.conf import settings
 import os
 
 
+
 def download_agent(request):
 
     file_path = os.path.join(settings.BASE_DIR, "download", "msafe-agent.apk")
 
-    if not os.path.isfile(file_path):
-        raise Http404(f"APK not found at {file_path}")
+    if not os.path.exists(file_path):
+        return HttpResponse(f"File not found: {file_path}")
 
-    file = open(file_path, "rb")
-
-    response = FileResponse(
-        file,
-        content_type="application/vnd.android.package-archive"
-    )
-
-    response["Content-Disposition"] = "attachment; filename=msafe-agent.apk"
-
-    return response
+    try:
+        return FileResponse(
+            open(file_path, "rb"),
+            content_type="application/vnd.android.package-archive"
+        )
+    except Exception as e:
+        return HttpResponse(f"Error opening file: {str(e)}")
