@@ -1,18 +1,15 @@
-#!/bin/sh
-
-echo "⚙️ Entry script starting..."
-
-cd /app || exit 1
-
-echo "📂 Current dir: $(pwd)"
-echo "📄 Files in /app:"
-ls
-
-echo "⏳ Waiting for database..."
-sleep 5
-
 echo "📦 Running migrations..."
 python manage.py migrate --noinput
+
+echo "👤 Creating admin user..."
+
+python manage.py shell <<EOF
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+if not User.objects.filter(username="admin").exists():
+    User.objects.create_superuser("admin", "admin@example.com", "admin123")
+EOF
 
 echo "🧹 Collecting static files..."
 python manage.py collectstatic --noinput
