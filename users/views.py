@@ -301,3 +301,93 @@ class DPCEnrollView(APIView):
             {"detail": "Enroll success."},
             status=status.HTTP_200_OK
         )
+# =========================================================
+# LOCK STATUS ACK
+# =========================================================
+
+class DPCLockStatusAckView(APIView):
+
+    permission_classes = [IsDPCClient]
+
+    def post(self, request):
+
+        imei1 = request.data.get("imei1")
+        locked = request.data.get("locked")
+
+        device = Device.objects.filter(imei1=imei1).first()
+
+        if not device:
+            return Response(
+                {"detail": "Device not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        device.is_locked = locked
+        device.save(update_fields=["is_locked"])
+
+        AuditLog.objects.create(
+            customer=device.customer,
+            device=device,
+            manager=device.customer.manager,
+            action=AuditLog.ACTION_LOCK_DEVICE,
+            status=AuditLog.STATUS_SUCCESS,
+            payload={"locked": locked},
+        )
+
+        return Response(
+            {"detail": "Lock status updated"},
+            status=status.HTTP_200_OK,
+        )
+
+
+# =========================================================
+# S3 UPLOAD URL
+# =========================================================
+
+class S3UploadUrlView(APIView):
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+
+        filename = request.data.get("filename")
+
+        if not filename:
+            return Response(
+                {"detail": "filename required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        url = generate_s3_presigned_url(filename)
+
+        return Response({"upload_url": url})
+
+
+# =========================================================
+# DPC UNENROLL ACK
+# =========================================================
+
+class DPCUnenrollAckView(APIView):
+
+    permission_classes = [IsDPCClient]
+
+    def post(self, request):
+
+        imei1 = request.data.get("imei1")
+
+        device = Device.objects.filter(imei1=imei1).first()
+
+        if not device:
+            return Response(
+                {"detail": "Device not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        device.dpc_status = Device.DPC_STATUS_UNENROLLED
+        device.last_seen_at = timezone.now()
+        device.save(update_fields=["dpc_status", "last_seen_at"])
+
+        return Response(
+            {"detail": "Unenroll acknowledged"},
+            status=status.HTTP_200_OK,
+        )

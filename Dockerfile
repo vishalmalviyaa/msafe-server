@@ -1,13 +1,13 @@
 FROM python:3.11-slim
 
-# Prevent Python from writing .pyc files and using stdout buffering
+# Python settings
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Set workdir
+# Work directory
 WORKDIR /app
 
-# System deps (Postgres client, Pillow, qrcode)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
@@ -15,19 +15,21 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt /app/
+# Copy requirements first (better caching)
+COPY requirements.txt .
 
-# Install dependencies
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project code
-COPY . /app/
+# Copy project
+COPY . .
 
-# Entrypoint script
+# Copy entrypoint
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Render port (Render uses $PORT automatically)
 EXPOSE 8000
 
+# Start container
 ENTRYPOINT ["/entrypoint.sh"]

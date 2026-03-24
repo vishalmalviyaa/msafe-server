@@ -20,7 +20,7 @@ python manage.py collectstatic --noinput
 echo "🚀 Starting Gunicorn..."
 
 exec gunicorn vishkey_backend.wsgi:application \
-  --bind 0.0.0.0:8000 \
+  --bind 0.0.0.0:$PORT \
   --workers 2 \
   --timeout 120 \
   --access-logfile - \
