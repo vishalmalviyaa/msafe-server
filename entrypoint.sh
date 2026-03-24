@@ -1,3 +1,9 @@
+#!/bin/sh
+
+echo "⚙️ Entry script starting..."
+
+cd /app || exit 1
+
 echo "📦 Running migrations..."
 python manage.py migrate --noinput
 
