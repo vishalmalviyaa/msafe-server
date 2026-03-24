@@ -74,10 +74,16 @@ class DeviceRegisterView(APIView):
         device_id = request.data.get("device_id")
         fcm_token = request.data.get("fcm_token")
 
+        if not imei_1:
+            return Response(
+                {"error": "imei_1 required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         if not device_id or not fcm_token:
             return Response(
                 {"error": "device_id and fcm_token required"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         obj, created = DeviceRegistration.objects.update_or_create(
@@ -91,19 +97,15 @@ class DeviceRegisterView(APIView):
             },
         )
 
-        # generate token only once
-        if created:
+        if created and not obj.device_token:
             obj.device_token = secrets.token_hex(32)
             obj.save(update_fields=["device_token"])
 
-        return Response(
-            {
-                "registered": True,
-                "device_id": obj.device_id,
-                "device_token": obj.device_token,
-            }
-        )
-
+        return Response({
+            "registered": True,
+            "device_id": obj.device_id,
+            "device_token": obj.device_token,
+        })
 
 # ---------------------------------------------------
 # DEVICE HEARTBEAT
@@ -118,12 +120,17 @@ class DeviceHeartbeatView(APIView):
         device_id = request.data.get("device_id")
         token = request.headers.get("X-DEVICE-TOKEN")
 
+        if not device_id or not token:
+            return Response(
+                {"error": "device_id and device token required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             device = DeviceRegistration.objects.get(
                 device_id=device_id,
                 device_token=token,
             )
-
         except DeviceRegistration.DoesNotExist:
             return Response(
                 {"error": "invalid device"},

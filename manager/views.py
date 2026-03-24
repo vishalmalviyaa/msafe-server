@@ -1,11 +1,13 @@
 import secrets
-import qrcode
-from io import BytesIO
-from datetime import timedelta
 import json
-from django.http import HttpResponse
-from django.utils import timezone
+import os
+import qrcode
+
+from io import BytesIO
+
+from django.http import HttpResponse, FileResponse
 from django.core.cache import cache
+from django.conf import settings
 
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
@@ -24,11 +26,6 @@ from .permissions import IsManager
 
 from scalability_core.models import DeviceRegistration, FcmCommand
 from scalability_core.tasks import send_fcm_command_task
-from django.http import FileResponse, HttpResponse
-from django.conf import settings
-import os
-
-
 
 # =========================================================
 # CUSTOMER MANAGEMENT
@@ -85,7 +82,7 @@ class ManagerCustomerViewSet(viewsets.ModelViewSet):
     "https://api.msafe.shop/api/manager/download/msafe-agent.apk",
 
     "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM":
-    "BAAB5D65DE30674600CCFB2D28D2526C8B459885C76042D4857CD621602B7AFE",
+    "baab5d65de30674600ccfb2d28d2526c8b459885c76042d4857cd621602b7afe",
 
     "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
 
@@ -495,6 +492,7 @@ class ManagerDashboardView(APIView):
             Device.objects
             .filter(customer__manager=manager)
             .select_related("customer", "device_registration")
+            .prefetch_related()
         )
 
         result = []
@@ -585,12 +583,14 @@ def download_agent(request):
     file_path = os.path.join(settings.BASE_DIR, "download", "msafe-agent.apk")
 
     if not os.path.exists(file_path):
-        return HttpResponse(f"File not found: {file_path}")
+        return HttpResponse("APK file not found.", status=404)
 
     try:
         return FileResponse(
             open(file_path, "rb"),
-            content_type="application/vnd.android.package-archive"
+            content_type="application/vnd.android.package-archive",
+            as_attachment=True,
+            filename="msafe-agent.apk"
         )
     except Exception as e:
-        return HttpResponse(f"Error opening file: {str(e)}")
+        return HttpResponse(f"Error opening file: {str(e)}", status=500)

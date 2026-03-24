@@ -8,7 +8,6 @@ class DeviceRegistrationSerializer(serializers.ModelSerializer):
         model = DeviceRegistration
         fields = [
             "id",
-            "user",
             "manager_id",
             "imei_1",
             "imei_2",
@@ -21,7 +20,6 @@ class DeviceRegistrationSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
-
 
 class CommandAckSerializer(serializers.Serializer):
     action = serializers.CharField()
