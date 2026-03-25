@@ -20,7 +20,10 @@ class GenerateProvisioningQR(APIView):
 
     def get(self, request, customer_id):
 
-        customer = Customer.objects.get(id=customer_id)
+        customer = Customer.objects.filter(id=customer_id).first()
+
+        if not customer:
+            return HttpResponse("Customer not found", status=404)
 
         token = EnrollmentToken.objects.create(
             token=EnrollmentToken.generate_token(),
@@ -29,9 +32,12 @@ class GenerateProvisioningQR(APIView):
         )
 
         payload = {
+
             "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME":
             "com.vashu.msafe.agent/.receiver.DeviceAdminReceiver",
+
             "android.app.extra.PROVISIONING_SKIP_ENCRYPTION": True,
+
             "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION":
             APK_URL,
 

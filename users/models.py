@@ -12,14 +12,20 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
+# =========================================================
+# CUSTOMER
+# =========================================================
+
 class Customer(TimeStampedModel):
     """
     Business user (borrower / end user).
     """
+
     manager = models.ForeignKey(
         "manager.ManagerProfile",
         on_delete=models.CASCADE,
         related_name="customers",
+        db_index=True,
     )
 
     name = models.CharField(max_length=255)
@@ -37,13 +43,18 @@ class Customer(TimeStampedModel):
     signature = models.URLField(null=True, blank=True)
 
     # soft delete / active flag
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     def __str__(self):
         return f"{self.name} ({self.phone})"
 
 
+# =========================================================
+# DEVICE
+# =========================================================
+
 class Device(TimeStampedModel):
+
     LOCK_STATUS_LOCKED = "LOCKED"
     LOCK_STATUS_UNLOCKED = "UNLOCKED"
     LOCK_STATUS_PENDING_LOCK = "PENDING_LOCK"
@@ -70,10 +81,11 @@ class Device(TimeStampedModel):
         Customer,
         on_delete=models.CASCADE,
         related_name="device",
+        db_index=True,
     )
 
-    imei1 = models.CharField(max_length=32, unique=True)
-    imei2 = models.CharField(max_length=32, unique=True, null=True, blank=True)
+    imei1 = models.CharField(max_length=32, unique=True, db_index=True)
+    imei2 = models.CharField(max_length=32, unique=True, null=True, blank=True, db_index=True)
 
     mobile_name = models.CharField(max_length=255, blank=True)
     mobile_number = models.CharField(max_length=20, blank=True)
@@ -92,15 +104,19 @@ class Device(TimeStampedModel):
         max_length=20,
         choices=LOCK_STATUS_CHOICES,
         default=LOCK_STATUS_UNLOCKED,
+        db_index=True,
     )
+
     dpc_status = models.CharField(
         max_length=20,
         choices=DPC_STATUS_CHOICES,
         default=DPC_STATUS_ENROLLED,
+        db_index=True,
     )
-    last_seen_at = models.DateTimeField(null=True, blank=True)
 
-    # DPC FCM token (for legacy direct sends)
+    last_seen_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    # DPC FCM token (for push commands)
     dpc_fcm_token = models.CharField(max_length=255, null=True, blank=True)
 
     # Link into scalability_core infrastructure
@@ -120,10 +136,18 @@ class Device(TimeStampedModel):
             models.Index(fields=["imei1"]),
             models.Index(fields=["imei2"]),
             models.Index(fields=["customer"]),
+            models.Index(fields=["last_seen_at"]),
+            models.Index(fields=["dpc_status"]),
+            models.Index(fields=["lock_status"]),
         ]
 
 
+# =========================================================
+# ENROLLMENT TOKEN
+# =========================================================
+
 class EnrollmentToken(TimeStampedModel):
+
     STATUS_ACTIVE = "ACTIVE"
     STATUS_USED = "USED"
     STATUS_EXPIRED = "EXPIRED"
@@ -134,26 +158,41 @@ class EnrollmentToken(TimeStampedModel):
         (STATUS_EXPIRED, "Expired"),
     )
 
-    token = models.CharField(max_length=128, unique=True)
+    token = models.CharField(max_length=128, unique=True, db_index=True)
+
     manager = models.ForeignKey(
         "manager.ManagerProfile",
         on_delete=models.CASCADE,
         related_name="enrollment_tokens",
+        db_index=True,
     )
+
     customer = models.ForeignKey(
         Customer,
         on_delete=models.CASCADE,
         related_name="enrollment_tokens",
+        db_index=True,
     )
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_ACTIVE,
+        db_index=True,
+    )
+
     expires_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"EnrollmentToken({self.token}, {self.status})"
 
 
+# =========================================================
+# AUDIT LOG
+# =========================================================
+
 class AuditLog(TimeStampedModel):
+
     ACTION_DELETE_USER = "DELETE_USER"
     ACTION_ENROLL_USER = "ENROLL_USER"
     ACTION_LOCK_USER = "LOCK_USER"
@@ -186,24 +225,30 @@ class AuditLog(TimeStampedModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="audit_logs",
+        db_index=True,
     )
+
     customer = models.ForeignKey(
         Customer,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="audit_logs",
+        db_index=True,
     )
+
     device = models.ForeignKey(
         Device,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="audit_logs",
+        db_index=True,
     )
 
-    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+
     payload = models.JSONField(null=True, blank=True)
 
     def __str__(self):

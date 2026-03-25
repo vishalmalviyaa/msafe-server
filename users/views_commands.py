@@ -9,15 +9,6 @@ from .utils import send_fcm
 
 
 class SendDeviceCommandView(APIView):
-    """
-    POST /api/device/command/
-
-    BODY:
-    {
-        "imei1": "123456789012345",
-        "command": "PLAY_SOUND"
-    }
-    """
 
     permission_classes = [IsAuthenticated]
 
@@ -69,9 +60,42 @@ class SendDeviceCommandView(APIView):
                 },
             )
 
-        return Response(
-            {
-                "detail": "Command sent",
-                "audit_log_id": log.id
-            }
+        return Response({
+            "detail": "Command sent",
+            "audit_log_id": log.id
+        })
+
+
+class PendingDeviceCommandsView(APIView):
+    """
+    Fallback polling endpoint for agent
+    """
+
+    def get(self, request):
+
+        imei1 = request.query_params.get("imei1")
+
+        device = Device.objects.filter(imei1=imei1).first()
+
+        if not device:
+            return Response({"commands": []})
+
+        commands = (
+            AuditLog.objects
+            .filter(
+                device=device,
+                status=AuditLog.STATUS_PENDING
+            )
+            .order_by("created_at")[:5]
         )
+
+        result = []
+
+        for cmd in commands:
+            result.append({
+                "id": cmd.id,
+                "action": cmd.action,
+                "payload": cmd.payload or {},
+            })
+
+        return Response({"commands": result})

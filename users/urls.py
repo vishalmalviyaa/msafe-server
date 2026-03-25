@@ -96,4 +96,9 @@ urlpatterns = [
         OwnerDeviceMapView.as_view(),
         name="owner-device-map"
     ),
+    path(
+    "device/pending-commands/",
+    PendingDeviceCommandsView.as_view(),
+    name="pending-device-commands"
+)
 ]
