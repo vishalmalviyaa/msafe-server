@@ -1,7 +1,7 @@
 from django.urls import path
 
 from .views_provision_qr import GenerateProvisioningQR
-from .views import PendingDeviceCommandsView
+from .views_commands import PendingDeviceCommandsView
 from .views import (
     DeviceHeartbeatView,
     DPCUnenrollAckView,
