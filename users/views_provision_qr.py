@@ -11,7 +11,7 @@ from .models import EnrollmentToken, Customer
 
 APK_URL = "https://api.msafe.shop/download/msafe-agent.apk"
 
-APK_CHECKSUM = "baab5d65de30674600ccfb2d28d2526c8b459885c76042d4857cd621602b7afe"
+APK_CHECKSUM = "e2ce4a93bf38bc210a30266a10673e4b6eafe3c3554945e78c13fa0d0a277c6f"
 
 
 class GenerateProvisioningQR(APIView):
