@@ -14,7 +14,23 @@ from .utils import generate_s3_presigned_url, send_fcm_to_manager, send_fcm_to_o
 from scalability_core.models import DeviceRegistration
 
 import secrets
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def auth_me(request):
+
+    user = request.user
+
+    return Response({
+        "username": user.username,
+        "is_owner": user.is_superuser,
+        "is_manager": hasattr(user, "managerprofile"),
+        "manager_id": getattr(user, "managerprofile_id", None),
+    })
 
 # =========================================================
 # DEVICE HEARTBEAT
