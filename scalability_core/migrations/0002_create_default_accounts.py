@@ -3,36 +3,24 @@ from django.db import migrations
 
 def create_default_accounts(apps, schema_editor):
 
-    User = apps.get_model("scalability_core", "User")
+    User = apps.get_model("auth", "User")
     ManagerProfile = apps.get_model("manager", "ManagerProfile")
-
-    # =====================
-    # OWNER ACCOUNT
-    # =====================
 
     if not User.objects.filter(username="owner").exists():
 
-        owner = User(
+        owner = User.objects.create_superuser(
             username="owner",
             email="owner@msafe.com",
-            is_staff=True,
-            is_superuser=True
+            password="owner123"
         )
-        owner.set_password("owner123")
-        owner.save()
-
-    # =====================
-    # MANAGER ACCOUNT
-    # =====================
 
     if not User.objects.filter(username="manager").exists():
 
-        manager_user = User(
+        manager_user = User.objects.create_user(
             username="manager",
-            email="manager@msafe.com"
+            email="manager@msafe.com",
+            password="manager123"
         )
-        manager_user.set_password("manager123")
-        manager_user.save()
 
         ManagerProfile.objects.create(
             user=manager_user,
@@ -45,7 +33,6 @@ def create_default_accounts(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("scalability_core", "0001_initial"),
         ("manager", "0001_initial"),
     ]
 

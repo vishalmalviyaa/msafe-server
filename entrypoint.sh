@@ -7,14 +7,47 @@ cd /app || exit 1
 echo "📦 Running migrations..."
 python manage.py migrate --noinput
 
-echo "👤 Creating admin user..."
+echo "👤 Creating default accounts..."
 
 python manage.py shell <<EOF
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
+# ---------------------
+# ADMIN
+# ---------------------
 if not User.objects.filter(username="admin").exists():
-    User.objects.create_superuser("admin", "admin@example.com", "admin123")
+    User.objects.create_superuser(
+        "admin",
+        "admin@msafe.com",
+        "admin123"
+    )
+    print("✅ Admin created")
+
+# ---------------------
+# OWNER
+# ---------------------
+if not User.objects.filter(username="owner").exists():
+    User.objects.create_user(
+        "owner",
+        "owner@msafe.com",
+        "owner123",
+        is_staff=True
+    )
+    print("✅ Owner created")
+
+# ---------------------
+# MANAGER
+# ---------------------
+if not User.objects.filter(username="manager").exists():
+    User.objects.create_user(
+        "manager",
+        "manager@msafe.com",
+        "manager123"
+    )
+    print("✅ Manager created")
+
+print("🚀 Default accounts ready")
 EOF
 
 echo "🧹 Collecting static files..."
