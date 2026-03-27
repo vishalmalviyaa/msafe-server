@@ -3,7 +3,7 @@ from django.db import migrations
 
 def create_default_accounts(apps, schema_editor):
 
-    User = apps.get_model("auth", "User")
+    User = apps.get_model("scalability_core", "User")
     ManagerProfile = apps.get_model("manager", "ManagerProfile")
 
     # =====================
@@ -12,11 +12,14 @@ def create_default_accounts(apps, schema_editor):
 
     if not User.objects.filter(username="owner").exists():
 
-        owner = User.objects.create_superuser(
+        owner = User(
             username="owner",
             email="owner@msafe.com",
-            password="owner123"
+            is_staff=True,
+            is_superuser=True
         )
+        owner.set_password("owner123")
+        owner.save()
 
     # =====================
     # MANAGER ACCOUNT
@@ -24,11 +27,12 @@ def create_default_accounts(apps, schema_editor):
 
     if not User.objects.filter(username="manager").exists():
 
-        manager_user = User.objects.create_user(
+        manager_user = User(
             username="manager",
-            email="manager@msafe.com",
-            password="manager123"
+            email="manager@msafe.com"
         )
+        manager_user.set_password("manager123")
+        manager_user.save()
 
         ManagerProfile.objects.create(
             user=manager_user,
