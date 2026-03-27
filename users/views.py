@@ -18,6 +18,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from manager.models import ManagerProfile
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -25,13 +27,17 @@ def auth_me(request):
 
     user = request.user
 
+    manager_profile = ManagerProfile.objects.filter(user=user).first()
+
+    is_owner = user.is_superuser or user.is_staff
+    is_manager = manager_profile is not None
+
     return Response({
         "username": user.username,
-        "is_owner": user.is_superuser,
-        "is_manager": hasattr(user, "managerprofile"),
-        "manager_id": getattr(user, "managerprofile_id", None),
+        "is_owner": is_owner,
+        "is_manager": is_manager,
+        "manager_id": manager_profile.id if manager_profile else None
     })
-
 # =========================================================
 # DEVICE HEARTBEAT
 # =========================================================
