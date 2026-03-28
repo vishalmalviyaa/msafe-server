@@ -26,9 +26,14 @@ COPY . .
 
 # Copy entrypoint
 COPY entrypoint.sh /entrypoint.sh
+
+# Fix Windows line endings automatically
+RUN sed -i 's/\r$//' /entrypoint.sh
+
+# Make executable
 RUN chmod +x /entrypoint.sh
 
-# Render port (Render uses $PORT automatically)
+# Render port
 EXPOSE 8000
 
 # Start container
