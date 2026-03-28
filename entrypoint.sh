@@ -5,13 +5,13 @@ echo "⚙️ Entry script starting..."
 cd /app || exit 1
 
 echo "📦 Running migrations..."
+python manage.py makemigrations --noinput
 python manage.py migrate --noinput
 
 echo "👤 Creating default accounts..."
 
 python manage.py shell <<EOF
 from django.contrib.auth import get_user_model
-from manager.models import ManagerProfile
 
 User = get_user_model()
 
@@ -39,13 +39,21 @@ if created:
     manager.set_password("manager123")
     manager.save()
 
-if not ManagerProfile.objects.filter(user=manager).exists():
-    ManagerProfile.objects.create(
-        user=manager,
-        phone="9999999999",
-        total_keys=100,
-        used_keys=0
-    )
+# create manager profile safely
+try:
+    from manager.models import ManagerProfile
+
+    if not ManagerProfile.objects.filter(user=manager).exists():
+        ManagerProfile.objects.create(
+            user=manager,
+            phone="9999999999",
+            total_keys=100,
+            used_keys=0
+        )
+    print("Manager profile ready")
+
+except Exception as e:
+    print("ManagerProfile skipped:", e)
 
 print("Default accounts ready")
 EOF
