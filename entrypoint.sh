@@ -1,3 +1,4 @@
+
 #!/bin/sh
 
 echo "⚙️ Entry script starting..."
@@ -11,41 +12,60 @@ echo "👤 Creating default accounts..."
 
 python manage.py shell <<EOF
 from django.contrib.auth import get_user_model
+from manager.models import ManagerProfile
+
 User = get_user_model()
 
 # ---------------------
 # ADMIN
 # ---------------------
-if not User.objects.filter(username="admin").exists():
-    User.objects.create_superuser(
-        "admin",
-        "admin@msafe.com",
-        "admin123"
-    )
+admin, created = User.objects.get_or_create(
+    username="admin",
+    defaults={"email": "admin@msafe.com", "is_superuser": True, "is_staff": True}
+)
+
+if created:
+    admin.set_password("admin123")
+    admin.save()
     print("✅ Admin created")
 
 # ---------------------
 # OWNER
 # ---------------------
-if not User.objects.filter(username="owner").exists():
-    User.objects.create_user(
-        "owner",
-        "owner@msafe.com",
-        "owner123",
-        is_staff=True
-    )
+owner, created = User.objects.get_or_create(
+    username="owner",
+    defaults={"email": "owner@msafe.com", "is_staff": True}
+)
+
+if created:
+    owner.set_password("owner123")
+    owner.save()
     print("✅ Owner created")
 
 # ---------------------
 # MANAGER
 # ---------------------
-if not User.objects.filter(username="manager").exists():
-    User.objects.create_user(
-        "manager",
-        "manager@msafe.com",
-        "manager123"
+manager, created = User.objects.get_or_create(
+    username="manager",
+    defaults={"email": "manager@msafe.com"}
+)
+
+if created:
+    manager.set_password("manager123")
+    manager.save()
+    print("✅ Manager user created")
+
+# ---------------------
+# MANAGER PROFILE
+# ---------------------
+if not ManagerProfile.objects.filter(user=manager).exists():
+    ManagerProfile.objects.create(
+        user=manager,
+        phone="9999999999",
+        total_keys=100,
+        used_keys=0
     )
-    print("✅ Manager created")
+    print("✅ ManagerProfile created")
 
 print("🚀 Default accounts ready")
 EOF
