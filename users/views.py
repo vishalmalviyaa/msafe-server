@@ -20,7 +20,13 @@ from rest_framework.response import Response
 
 from manager.models import ManagerProfile
 
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import CustomTokenObtainPairSerializer
 
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+    
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def auth_me(request):

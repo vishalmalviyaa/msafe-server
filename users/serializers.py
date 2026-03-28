@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import Customer, Device, EnrollmentToken, AuditLog
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from manager.models import ManagerProfile
 
 
 class DeviceSerializer(serializers.ModelSerializer):
@@ -137,3 +139,31 @@ class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AuditLog
         fields = "__all__"
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        manager_profile = ManagerProfile.objects.filter(user=user).first()
+
+        token["username"] = user.username
+        token["is_owner"] = user.is_superuser or user.is_staff
+        token["is_manager"] = manager_profile is not None
+        token["manager_id"] = manager_profile.id if manager_profile else None
+
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        manager_profile = ManagerProfile.objects.filter(user=self.user).first()
+
+        data["username"] = self.user.username
+        data["is_owner"] = self.user.is_superuser or self.user.is_staff
+        data["is_manager"] = manager_profile is not None
+        data["manager_id"] = manager_profile.id if manager_profile else None
+
+        return data
