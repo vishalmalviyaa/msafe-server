@@ -1,40 +1,115 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+
 from dotenv import load_dotenv
 import dj_database_url
+
+
+# ============================================================
+# ENVIRONMENT
+# ============================================================
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# ------------------------------------------------
-# Core
-# ------------------------------------------------
+def env_bool(name, default=False):
+    value = os.getenv(name)
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
+    if value is None:
+        return default
 
-DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
+    return value.strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def env_int(name, default):
+    value = os.getenv(name)
+
+    if value is None:
+        return default
+
+    try:
+        return int(value)
+    except ValueError:
+        raise RuntimeError(
+            f"{name} must be a valid integer."
+        )
+
+
+# ============================================================
+# CORE
+# ============================================================
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+
+if not SECRET_KEY:
+    if env_bool("DJANGO_DEBUG", False):
+        SECRET_KEY = "dev-only-secret-key"
+    else:
+        raise RuntimeError(
+            "DJANGO_SECRET_KEY is required in production."
+        )
+
+
+DEBUG = env_bool(
+    "DJANGO_DEBUG",
+    False,
+)
+
+
+# ============================================================
+# HOSTS
+# ============================================================
 
 ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "api.msafe.shop",
-    "msafe-server.onrender.com",
+    host.strip()
+    for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS",
+        "api.msafe.shop,msafe-server.onrender.com",
+    ).split(",")
+    if host.strip()
 ]
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://api.msafe.shop",
+    origin.strip()
+    for origin in os.getenv(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        "https://api.msafe.shop",
+    ).split(",")
+    if origin.strip()
 ]
 
 
-# ------------------------------------------------
-# Installed apps
-# ------------------------------------------------
+# ============================================================
+# REVERSE PROXY / HTTPS
+# ============================================================
+
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)
+
+
+USE_X_FORWARDED_HOST = env_bool(
+    "DJANGO_USE_X_FORWARDED_HOST",
+    False,
+)
+
+
+# ============================================================
+# APPLICATIONS
+# ============================================================
 
 INSTALLED_APPS = [
+    # Django
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -42,15 +117,19 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
+    # Static files
     "whitenoise.runserver_nostatic",
 
+    # REST API
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
 
+    # Celery
     "django_celery_results",
     "django_celery_beat",
 
+    # Project
     "owner",
     "manager",
     "users",
@@ -58,36 +137,50 @@ INSTALLED_APPS = [
 ]
 
 
-# ------------------------------------------------
-# Middleware
-# ------------------------------------------------
+# ============================================================
+# MIDDLEWARE
+# ============================================================
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+
     "whitenoise.middleware.WhiteNoiseMiddleware",
+
     "django.contrib.sessions.middleware.SessionMiddleware",
+
     "django.middleware.common.CommonMiddleware",
+
     "django.middleware.csrf.CsrfViewMiddleware",
+
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+
     "django.contrib.messages.middleware.MessageMiddleware",
+
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+
+# ============================================================
+# URL / WSGI
+# ============================================================
 
 ROOT_URLCONF = "vishkey_backend.urls"
 
 WSGI_APPLICATION = "vishkey_backend.wsgi.application"
 
 
-# ------------------------------------------------
-# Templates
-# ------------------------------------------------
+# ============================================================
+# TEMPLATES
+# ============================================================
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
+
         "DIRS": [],
+
         "APP_DIRS": True,
+
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.debug",
@@ -100,132 +193,480 @@ TEMPLATES = [
 ]
 
 
-# ------------------------------------------------
-# DATABASE (Render compatible)
-# ------------------------------------------------
+# ============================================================
+# DATABASE
+# ============================================================
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not configured."
+    )
+
 
 DATABASES = {
-    "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL"),
-        conn_max_age=600,
-        ssl_require=False,
+    "default": dj_database_url.parse(
+        DATABASE_URL,
+
+        conn_max_age=env_int(
+            "DATABASE_CONN_MAX_AGE",
+            600,
+        ),
+
+        conn_health_checks=True,
+
+        ssl_require=env_bool(
+            "DATABASE_SSL_REQUIRE",
+            True,
+        ),
     )
 }
 
 
-# ------------------------------------------------
-# Password validation
-# ------------------------------------------------
+# ============================================================
+# DATABASE OPTIONS
+# ============================================================
+
+DATABASES["default"].setdefault(
+    "OPTIONS",
+    {}
+)
+
+DATABASES["default"]["OPTIONS"].setdefault(
+    "connect_timeout",
+    env_int(
+        "DATABASE_CONNECT_TIMEOUT",
+        10,
+    ),
+)
+
+
+# ============================================================
+# PASSWORD VALIDATION
+# ============================================================
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "UserAttributeSimilarityValidator"
+        ),
+    },
+
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "MinimumLengthValidator"
+        ),
+        "OPTIONS": {
+            "min_length": 10,
+        },
+    },
+
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "CommonPasswordValidator"
+        ),
+    },
+
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "NumericPasswordValidator"
+        ),
+    },
 ]
 
 
-# ------------------------------------------------
-# Internationalization
-# ------------------------------------------------
+# ============================================================
+# INTERNATIONALIZATION
+# ============================================================
 
 LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "Asia/Kolkata"
 
 USE_I18N = True
+
 USE_TZ = True
 
 
-# ------------------------------------------------
-# Static files
-# ------------------------------------------------
+# ============================================================
+# STATIC FILES
+# ============================================================
 
 STATIC_URL = "/static/"
+
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STATICFILES_STORAGE = (
+    "whitenoise.storage."
+    "CompressedManifestStaticFilesStorage"
+)
+
+
+# ============================================================
+# MEDIA
+# ============================================================
 
 MEDIA_URL = "/media/"
+
 MEDIA_ROOT = BASE_DIR / "media"
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ============================================================
+# DEFAULT PRIMARY KEY
+# ============================================================
+
+DEFAULT_AUTO_FIELD = (
+    "django.db.models.BigAutoField"
+)
 
 
-# ------------------------------------------------
-# REST FRAMEWORK
-# ------------------------------------------------
+# ============================================================
+# DJANGO REST FRAMEWORK
+# ============================================================
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
+
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",
+        "user": "300/min",
+    },
+
+    "DEFAULT_PAGINATION_CLASS": (
+        "rest_framework.pagination."
+        "PageNumberPagination"
+    ),
+
+    "PAGE_SIZE": 50,
 }
 
 
-# ------------------------------------------------
+# ============================================================
 # JWT
-# ------------------------------------------------
+# ============================================================
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=60
+    ),
+
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=7
+    ),
+
+    "ROTATE_REFRESH_TOKENS": True,
+
+    "BLACKLIST_AFTER_ROTATION": True,
+
+    "UPDATE_LAST_LOGIN": True,
+
+    "ALGORITHM": "HS256",
+
+    "SIGNING_KEY": SECRET_KEY,
+
+    "AUTH_HEADER_TYPES": (
+        "Bearer",
+    ),
 }
 
 
-# ------------------------------------------------
-# SECURITY KEYS
-# ------------------------------------------------
+# ============================================================
+# APPLICATION SECURITY KEYS
+# ============================================================
 
-DPC_API_KEY = os.getenv("DPC_API_KEY", "super-secret")
+DPC_API_KEY = os.getenv("DPC_API_KEY")
 
-FCM_SERVER_KEY = os.getenv("FCM_SERVER_KEY", "")
+if not DPC_API_KEY:
+    if DEBUG:
+        DPC_API_KEY = "dev-dpc-key"
+    else:
+        raise RuntimeError(
+            "DPC_API_KEY is required in production."
+        )
 
 
-# ------------------------------------------------
-# Redis
-# ------------------------------------------------
+FCM_SERVER_KEY = os.getenv(
+    "FCM_SERVER_KEY",
+    "",
+)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# ============================================================
+# REDIS
+# ============================================================
+
+REDIS_URL = os.getenv(
+    "REDIS_URL",
+    "redis://localhost:6379/0",
+)
 
 
-# ------------------------------------------------
-# Cache
-# ------------------------------------------------
+# ============================================================
+# CACHE
+# ============================================================
 
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "BACKEND": (
+            "django.core.cache.backends.redis."
+            "RedisCache"
+        ),
+
         "LOCATION": REDIS_URL,
-    }
+
+        "TIMEOUT": 300,
+
+        "OPTIONS": {
+            "socket_connect_timeout": 5,
+            "socket_timeout": 5,
+        },
+    },
 }
 
 
-# ------------------------------------------------
-# Celery
-# ------------------------------------------------
+# ============================================================
+# CELERY
+# ============================================================
 
 CELERY_BROKER_URL = REDIS_URL
+
 CELERY_RESULT_BACKEND = REDIS_URL
-CELERY_ACCEPT_CONTENT = ["json"]
+
+CELERY_ACCEPT_CONTENT = [
+    "json",
+]
+
 CELERY_TASK_SERIALIZER = "json"
 
+CELERY_RESULT_SERIALIZER = "json"
 
-# ------------------------------------------------
-# Logging
-# ------------------------------------------------
+CELERY_TIMEZONE = TIME_ZONE
+
+CELERY_ENABLE_UTC = True
+
+CELERY_TASK_TRACK_STARTED = True
+
+CELERY_TASK_TIME_LIMIT = 300
+
+CELERY_TASK_SOFT_TIME_LIMIT = 240
+
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+
+# ============================================================
+# CELERY BEAT
+# ============================================================
+
+CELERY_BEAT_SCHEDULER = (
+    "django_celery_beat.schedulers."
+    "DatabaseScheduler"
+)
+
+
+# ============================================================
+# SESSION SECURITY
+# ============================================================
+
+SESSION_COOKIE_NAME = (
+    "msafe_session"
+)
+
+SESSION_COOKIE_HTTPONLY = True
+
+SESSION_COOKIE_SAMESITE = "Lax"
+
+SESSION_COOKIE_SECURE = not DEBUG
+
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 7
+
+
+# ============================================================
+# CSRF SECURITY
+# ============================================================
+
+CSRF_COOKIE_NAME = (
+    "msafe_csrf"
+)
+
+CSRF_COOKIE_HTTPONLY = False
+
+CSRF_COOKIE_SECURE = not DEBUG
+
+CSRF_COOKIE_SAMESITE = "Lax"
+
+CSRF_USE_SESSIONS = False
+
+
+# ============================================================
+# SECURITY HEADERS
+# ============================================================
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+SECURE_BROWSER_XSS_FILTER = True
+
+X_FRAME_OPTIONS = "DENY"
+
+SECURE_REFERRER_POLICY = (
+    "strict-origin-when-cross-origin"
+)
+
+
+# ============================================================
+# HTTPS SECURITY
+# ============================================================
+
+if not DEBUG:
+
+    SECURE_SSL_REDIRECT = True
+
+    SECURE_HSTS_SECONDS = env_int(
+        "DJANGO_HSTS_SECONDS",
+        31536000,
+    )
+
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+        "DJANGO_HSTS_INCLUDE_SUBDOMAINS",
+        True,
+    )
+
+    SECURE_HSTS_PRELOAD = env_bool(
+        "DJANGO_HSTS_PRELOAD",
+        True,
+    )
+
+
+# ============================================================
+# ADMIN
+# ============================================================
+
+ADMIN_URL = "admin/"
+
+
+# ============================================================
+# FILE UPLOAD LIMITS
+# ============================================================
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = env_int(
+    "DATA_UPLOAD_MAX_MEMORY_SIZE",
+    10 * 1024 * 1024,
+)
+
+FILE_UPLOAD_MAX_MEMORY_SIZE = env_int(
+    "FILE_UPLOAD_MAX_MEMORY_SIZE",
+    10 * 1024 * 1024,
+)
+
+
+# ============================================================
+# LOGGING
+# ============================================================
+
+LOG_LEVEL = os.getenv(
+    "DJANGO_LOG_LEVEL",
+    "INFO",
+).upper()
+
 
 LOGGING = {
     "version": 1,
+
     "disable_existing_loggers": False,
-    "handlers": {
-        "console": {"class": "logging.StreamHandler"},
+
+    "formatters": {
+        "production": {
+            "format": (
+                "{levelname} "
+                "{asctime} "
+                "{name} "
+                "{message}"
+            ),
+            "style": "{",
+        },
     },
+
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "production",
+        },
+    },
+
     "root": {
-        "handlers": ["console"],
-        "level": "INFO",
+        "handlers": [
+            "console",
+        ],
+        "level": LOG_LEVEL,
+    },
+
+    "loggers": {
+        "django": {
+            "handlers": [
+                "console",
+            ],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+
+        "django.request": {
+            "handlers": [
+                "console",
+            ],
+            "level": "ERROR",
+            "propagate": False,
+        },
+
+        "django.db.backends": {
+            "handlers": [
+                "console",
+            ],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }
+
+
+# ============================================================
+# PRODUCTION SAFETY CHECKS
+# ============================================================
+
+if not DEBUG:
+
+    if SECRET_KEY == "dev-secret":
+        raise RuntimeError(
+            "Unsafe SECRET_KEY detected in production."
+        )
+
+    if "api.msafe.shop" not in ALLOWED_HOSTS:
+        raise RuntimeError(
+            "api.msafe.shop must be present in ALLOWED_HOSTS."
+        )
+
+    if "https://api.msafe.shop" not in CSRF_TRUSTED_ORIGINS:
+        raise RuntimeError(
+            "https://api.msafe.shop must be present "
+            "in CSRF_TRUSTED_ORIGINS."
+        )
