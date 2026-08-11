@@ -47,21 +47,20 @@ def env_int(name, default):
 # CORE
 # ============================================================
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-
-if not SECRET_KEY:
-    if env_bool("DJANGO_DEBUG", False):
-        SECRET_KEY = "dev-only-secret-key"
-    else:
-        raise RuntimeError(
-            "DJANGO_SECRET_KEY is required in production."
-        )
-
-
 DEBUG = env_bool(
     "DJANGO_DEBUG",
     False,
 )
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "dev-only-secret-change-me"
+    else:
+        raise RuntimeError(
+            "DJANGO_SECRET_KEY is required in production."
+        )
 
 
 # ============================================================
@@ -77,6 +76,10 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+
+# ============================================================
+# CSRF
+# ============================================================
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
@@ -97,7 +100,6 @@ SECURE_PROXY_SSL_HEADER = (
     "https",
 )
 
-
 USE_X_FORWARDED_HOST = env_bool(
     "DJANGO_USE_X_FORWARDED_HOST",
     False,
@@ -117,7 +119,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Static files
+    # WhiteNoise
     "whitenoise.runserver_nostatic",
 
     # REST API
@@ -224,10 +226,7 @@ DATABASES = {
 }
 
 
-# ============================================================
-# DATABASE OPTIONS
-# ============================================================
-
+# Database connection options
 DATABASES["default"].setdefault(
     "OPTIONS",
     {}
@@ -400,7 +399,7 @@ DPC_API_KEY = os.getenv("DPC_API_KEY")
 
 if not DPC_API_KEY:
     if DEBUG:
-        DPC_API_KEY = "dev-dpc-key"
+        DPC_API_KEY = "dev-dpc-key-change-me"
     else:
         raise RuntimeError(
             "DPC_API_KEY is required in production."
@@ -489,9 +488,7 @@ CELERY_BEAT_SCHEDULER = (
 # SESSION SECURITY
 # ============================================================
 
-SESSION_COOKIE_NAME = (
-    "msafe_session"
-)
+SESSION_COOKIE_NAME = "msafe_session"
 
 SESSION_COOKIE_HTTPONLY = True
 
@@ -506,9 +503,7 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 7
 # CSRF SECURITY
 # ============================================================
 
-CSRF_COOKIE_NAME = (
-    "msafe_csrf"
-)
+CSRF_COOKIE_NAME = "msafe_csrf"
 
 CSRF_COOKIE_HTTPONLY = False
 
@@ -655,18 +650,37 @@ LOGGING = {
 
 if not DEBUG:
 
-    if SECRET_KEY == "dev-secret":
+    if SECRET_KEY in {
+        "dev-secret",
+        "dev-only-secret-change-me",
+    }:
         raise RuntimeError(
             "Unsafe SECRET_KEY detected in production."
         )
 
+    if len(SECRET_KEY) < 50:
+        raise RuntimeError(
+            "DJANGO_SECRET_KEY should be at least "
+            "50 characters in production."
+        )
+
     if "api.msafe.shop" not in ALLOWED_HOSTS:
         raise RuntimeError(
-            "api.msafe.shop must be present in ALLOWED_HOSTS."
+            "api.msafe.shop must be present "
+            "in ALLOWED_HOSTS."
         )
 
     if "https://api.msafe.shop" not in CSRF_TRUSTED_ORIGINS:
         raise RuntimeError(
             "https://api.msafe.shop must be present "
             "in CSRF_TRUSTED_ORIGINS."
+        )
+
+    if DPC_API_KEY in {
+        "super-secret",
+        "dev-dpc-key",
+        "dev-dpc-key-change-me",
+    }:
+        raise RuntimeError(
+            "Unsafe DPC_API_KEY detected in production."
         )
