@@ -226,7 +226,6 @@ DATABASES = {
 }
 
 
-# Database connection options
 DATABASES["default"].setdefault(
     "OPTIONS",
     {}
@@ -416,10 +415,15 @@ FCM_SERVER_KEY = os.getenv(
 # REDIS
 # ============================================================
 
-REDIS_URL = os.getenv(
-    "REDIS_URL",
-    "redis://localhost:6379/0",
-)
+REDIS_URL = os.getenv("REDIS_URL")
+
+if not REDIS_URL:
+    if DEBUG:
+        REDIS_URL = "redis://localhost:6379/0"
+    else:
+        raise RuntimeError(
+            "REDIS_URL is required in production."
+        )
 
 
 # ============================================================
