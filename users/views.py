@@ -30,19 +30,31 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def auth_me(request):
-
     user = request.user
 
-    manager_profile = ManagerProfile.objects.filter(user=user).first()
+    manager_profile = (
+        ManagerProfile.objects
+        .filter(user=user)
+        .first()
+    )
 
-    is_owner = user.is_superuser or user.is_staff
-    is_manager = manager_profile is not None
+    is_owner = bool(
+        user.is_superuser or user.is_staff
+    )
+
+    is_manager = bool(
+        manager_profile and not is_owner
+    )
 
     return Response({
         "username": user.username,
         "is_owner": is_owner,
         "is_manager": is_manager,
-        "manager_id": manager_profile.id if manager_profile else None
+        "manager_id": (
+            manager_profile.id
+            if is_manager
+            else None
+        ),
     })
 # =========================================================
 # DEVICE HEARTBEAT

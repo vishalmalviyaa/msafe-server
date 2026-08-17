@@ -167,7 +167,7 @@ class OwnerRegisterDeviceView(APIView):
         ser = OwnerDeviceSerializer(device)
         return Response(ser.data, status=status.HTTP_200_OK)
 class OwnerProfileView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwner]
 
     def get(self, request):
         try:
