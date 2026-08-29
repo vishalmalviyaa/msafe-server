@@ -30,31 +30,19 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def auth_me(request):
+
     user = request.user
 
-    manager_profile = (
-        ManagerProfile.objects
-        .filter(user=user)
-        .first()
-    )
+    manager_profile = ManagerProfile.objects.filter(user=user).first()
 
-    is_owner = bool(
-        user.is_superuser or user.is_staff
-    )
-
-    is_manager = bool(
-        manager_profile and not is_owner
-    )
+    is_owner = user.is_superuser or user.is_staff
+    is_manager = manager_profile is not None
 
     return Response({
         "username": user.username,
         "is_owner": is_owner,
         "is_manager": is_manager,
-        "manager_id": (
-            manager_profile.id
-            if is_manager
-            else None
-        ),
+        "manager_id": manager_profile.id if manager_profile else None
     })
 # =========================================================
 # DEVICE HEARTBEAT
@@ -354,7 +342,17 @@ class DPCLockStatusAckView(APIView):
         imei1 = request.data.get("imei1")
         locked = request.data.get("locked")
 
-        device = Device.objects.filter(imei1=imei1).first()
+        if imei1 is None or locked is None:
+            return Response(
+                {"detail": "imei1 and locked are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Accept "true"/"false" strings as well as real booleans.
+        if isinstance(locked, str):
+            locked = locked.strip().lower() in ("1", "true", "yes")
+
+        device = Device.objects.select_related("customer", "customer__manager").filter(imei1=imei1).first()
 
         if not device:
             return Response(
@@ -362,14 +360,14 @@ class DPCLockStatusAckView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        device.is_locked = locked
-        device.save(update_fields=["is_locked"])
+        device.lock_status = Device.LOCK_STATUS_LOCKED if locked else Device.LOCK_STATUS_UNLOCKED
+        device.save(update_fields=["lock_status"])
 
         AuditLog.objects.create(
             customer=device.customer,
             device=device,
             manager=device.customer.manager,
-            action=AuditLog.ACTION_LOCK_DEVICE,
+            action=AuditLog.ACTION_LOCK_USER if locked else AuditLog.ACTION_UNLOCK_USER,
             status=AuditLog.STATUS_SUCCESS,
             payload={"locked": locked},
         )
@@ -391,6 +389,7 @@ class S3UploadUrlView(APIView):
     def post(self, request):
 
         filename = request.data.get("filename")
+        content_type = request.data.get("content_type", "application/octet-stream")
 
         if not filename:
             return Response(
@@ -398,9 +397,15 @@ class S3UploadUrlView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        url = generate_s3_presigned_url(filename)
+        try:
+            upload_url, final_url = generate_s3_presigned_url(filename, content_type)
+        except RuntimeError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        return Response({"upload_url": url})
+        return Response({"upload_url": upload_url, "file_url": final_url})
 
 
 # =========================================================

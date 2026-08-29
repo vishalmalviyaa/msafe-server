@@ -13,12 +13,7 @@ from .views import (
 from .views_commands import SendDeviceCommandView
 from .views_qr import GenerateEnrollmentTokenView
 from .views_device_map import ManagerDeviceMapView, OwnerDeviceMapView
-from django.urls import path
 from .views import auth_me
-
-urlpatterns = [
-    path("auth/me/", auth_me),
-]
 
 urlpatterns = [
     path("auth/me/", auth_me),

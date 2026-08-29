@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Device
+from owner.permissions import IsOwner
 
 
 class ManagerDeviceMapView(APIView):
@@ -59,10 +60,15 @@ class ManagerDeviceMapView(APIView):
 
 class OwnerDeviceMapView(APIView):
     """
-    Owner sees ALL devices
+    Owner sees ALL devices.
+
+    NOTE: this previously only required IsAuthenticated, which meant any
+    logged-in manager could see every customer/device/manager on the
+    platform. Restricted to real owners (is_superuser), matching the rest
+    of the owner/ app.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwner]
 
     def get(self, request):
 

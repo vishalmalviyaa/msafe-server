@@ -1,3 +1,5 @@
+import secrets
+
 from django.db import models
 from django.utils import timezone
 
@@ -182,6 +184,16 @@ class EnrollmentToken(TimeStampedModel):
     )
 
     expires_at = models.DateTimeField(null=True, blank=True)
+
+    @classmethod
+    def generate_token(cls) -> str:
+        """URL-safe, unguessable token for QR provisioning / enrollment."""
+        return secrets.token_urlsafe(32)
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timezone.timedelta(minutes=10)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"EnrollmentToken({self.token}, {self.status})"

@@ -49,3 +49,8 @@ class LocationPingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LocationPing
         fields = "__all__"
+        # `device` must never be trusted from client input - a caller could
+        # otherwise post a location "ping" for any device_id it can guess.
+        # The view sets it explicitly from the token-authenticated
+        # DeviceRegistration (request.device) after IsValidDeviceToken passes.
+        read_only_fields = ["device"]

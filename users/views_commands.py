@@ -6,6 +6,7 @@ from rest_framework import status
 
 from .models import Device, AuditLog
 from .utils import send_fcm
+from .permissions import IsDPCClient
 
 
 class SendDeviceCommandView(APIView):
@@ -68,12 +69,26 @@ class SendDeviceCommandView(APIView):
 
 class PendingDeviceCommandsView(APIView):
     """
-    Fallback polling endpoint for agent
+    Fallback polling endpoint for agent.
+
+    This is called by the DPC agent itself (not a logged-in manager/owner),
+    so it authenticates the same way the other dpc/* endpoints do - via the
+    X-DPC-API-KEY header - rather than inheriting the global IsAuthenticated
+    default (which would both lock the real agent out, since it has no JWT,
+    and let any other manager poll any device's commands by guessing an
+    IMEI).
     """
+
+    permission_classes = [IsDPCClient]
 
     def get(self, request):
 
         imei1 = request.query_params.get("imei1")
+
+        if not imei1:
+            return Response(
+                {"detail": "imei1 required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         device = Device.objects.filter(imei1=imei1).first()
 

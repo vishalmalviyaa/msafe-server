@@ -19,7 +19,7 @@ from .models import (
     LocationPing,
 )
 
-from .permissions import IsOwnerOrManager
+from .permissions import IsOwnerOrManager, IsDeviceBootstrapClient, IsValidDeviceToken
 
 from .serializers import (
     CommandAckSerializer,
@@ -64,8 +64,14 @@ def health(request):
 # ---------------------------------------------------
 
 class DeviceRegisterView(APIView):
+    """
+    First-contact registration for a device. Previously AllowAny with no
+    verification at all, which meant anyone could re-register an existing
+    device_id and hijack its fcm_token (and therefore its push channel).
+    Now requires the shared bootstrap secret the agent app ships with.
+    """
 
-    permission_classes = [AllowAny]
+    permission_classes = [IsDeviceBootstrapClient]
 
     def post(self, request):
 
@@ -175,15 +181,22 @@ class DeviceHeartbeatView(APIView):
 # ---------------------------------------------------
 
 class DeviceLocationPingView(APIView):
+    """
+    Previously AllowAny, and the serializer accepted a raw `device` FK id
+    straight from the request body - meaning anyone could post a fake
+    location for any device_id without proving they controlled it. Now
+    requires X-DEVICE-TOKEN (see IsValidDeviceToken), and the device is
+    taken from the authenticated registration, never from client input.
+    """
 
-    permission_classes = [AllowAny]
+    permission_classes = [IsValidDeviceToken]
 
     def post(self, request):
 
         serializer = LocationPingSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        ping = serializer.save()
+        ping = serializer.save(device=request.device)
 
         device = ping.device
 
@@ -218,8 +231,16 @@ class DeviceLocationPingView(APIView):
 # ---------------------------------------------------
 
 class DeviceAckView(APIView):
+    """
+    Previously AllowAny with no verification of any kind - anyone who could
+    guess/enumerate a command_id could POST {"status": "SUCCESS"} here and
+    the reconcile task would happily mark a real device as UNLOCKED or
+    UNENROLLED. That's a full remote-unlock bypass for an anti-theft
+    product, so this now requires the caller to prove (via X-DEVICE-TOKEN)
+    that it *is* the device the command was actually sent to.
+    """
 
-    permission_classes = [AllowAny]
+    permission_classes = [IsValidDeviceToken]
 
     def post(self, request):
 
@@ -251,6 +272,15 @@ class DeviceAckView(APIView):
             return Response(
                 {"detail": "Command not found"},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # The token proved *a* device's identity - make sure it's the same
+        # device this command was actually addressed to, not some other
+        # registered device acking on its behalf.
+        if command.device_id != request.device.id:
+            return Response(
+                {"detail": "This command was not issued to your device."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         CommandAck.objects.create(
