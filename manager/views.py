@@ -19,6 +19,7 @@ from users.models import Customer, Device, AuditLog, EnrollmentToken
 from users.serializers import CustomerSerializer, CustomerCreateUpdateSerializer
 from users.permissions import IsManagerOfCustomer
 from users.utils import send_fcm_to_manager, send_fcm_to_owner
+from users.provisioning import build_provisioning_payload
 
 from .models import ManagerProfile
 from .serializers import ManagerProfileSerializer
@@ -60,37 +61,23 @@ class ManagerCustomerViewSet(viewsets.ModelViewSet):
 
         manager_profile = request.user.manager_profile
 
-        token = (
-            EnrollmentToken.objects
-            .filter(customer=customer)
-            .order_by("-created_at")
-            .first()
+        # Previously this looked up the MOST RECENT EnrollmentToken and
+        # 404'd if none existed - but nothing ever called the separate
+        # "generate token" endpoint first, so this always 404'd in
+        # practice. It also happily reused an already-expired token with
+        # no check. Now it always mints a fresh, short-lived token itself,
+        # same as the standalone GenerateProvisioningQR view.
+        token = EnrollmentToken.objects.create(
+            token=EnrollmentToken.generate_token(),
+            manager=manager_profile,
+            customer=customer,
         )
 
-        if not token:
-            return Response(
-                {"detail": "Enrollment token not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        payload = {
-
-    "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME":
-    "com.vashu.msafe.agent/.AdminReceiver",
-
-    "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION":
-    "https://api.msafe.shop/api/manager/download/msafe-agent.apk",
-
-    "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM":
-    "baab5d65de30674600ccfb2d28d2526c8b459885c76042d4857cd621602b7afe",
-
-    "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
-
-        "token": token.token,
-        "manager_id": manager_profile.id,
-        "imei1": device.imei1
-    }
-}
+        payload = build_provisioning_payload(
+            token=token.token,
+            manager_id=manager_profile.id,
+            imei1=device.imei1,
+        )
 
         qr = qrcode.make(json.dumps(payload))
 

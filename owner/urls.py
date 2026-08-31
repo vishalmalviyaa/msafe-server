@@ -5,6 +5,7 @@ from .views import (
     OwnerCustomerViewSet,
     OwnerManagerViewSet,
     OwnerForceDeleteUserView,
+    OwnerRegisterDeviceView,
     OwnerProfileView,
 )
 
@@ -30,6 +31,12 @@ urlpatterns = [
         "users/<int:pk>/force_delete/",
         OwnerForceDeleteUserView.as_view(),
         name="owner-force-delete",
+    ),
+
+    path(
+        "devices/register/",
+        OwnerRegisterDeviceView.as_view(),
+        name="owner-register-device",
     ),
 
     path(

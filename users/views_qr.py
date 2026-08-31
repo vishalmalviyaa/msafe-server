@@ -39,7 +39,13 @@ class GenerateEnrollmentTokenView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        manager_profile = request.user.manager_profile
+        manager_profile = getattr(request.user, "manager_profile", None)
+
+        if manager_profile is None:
+            return Response(
+                {"detail": "Only managers can generate enrollment tokens."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         if customer.manager != manager_profile:
             return Response(

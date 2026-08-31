@@ -211,6 +211,7 @@ class AuditLog(TimeStampedModel):
     ACTION_UNLOCK_USER = "UNLOCK_USER"
     ACTION_UPDATE_LOCATION = "UPDATE_LOCATION"
     ACTION_SIM_CHANGE = "SIM_CHANGE"
+    ACTION_ALLOCATE_KEYS = "ALLOCATE_KEYS"
 
     ACTION_CHOICES = (
         (ACTION_DELETE_USER, "Delete User"),
@@ -219,6 +220,7 @@ class AuditLog(TimeStampedModel):
         (ACTION_UNLOCK_USER, "Unlock User"),
         (ACTION_UPDATE_LOCATION, "Update Location"),
         (ACTION_SIM_CHANGE, "SIM Change"),
+        (ACTION_ALLOCATE_KEYS, "Allocate Keys"),
     )
 
     STATUS_SUCCESS = "SUCCESS"

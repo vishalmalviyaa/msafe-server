@@ -74,6 +74,54 @@ class OwnerManagerViewSet(viewsets.ModelViewSet):
     serializer_class = ManagerProfileSerializer
     permission_classes = [IsAuthenticated, IsOwner]
 
+    @action(detail=True, methods=["post"], url_path="allocate_keys")
+    def allocate_keys(self, request, pk=None):
+        """
+        POST /api/owner/managers/{id}/allocate_keys/
+        Body: {"keys": 10}  -> adds 10 to the manager's total_keys.
+
+        total_keys/used_keys are read_only on ManagerProfileSerializer on
+        purpose (a manager shouldn't be able to grant itself keys via a
+        normal profile PATCH) - this is the one deliberate, owner-only door
+        for adjusting that number.
+        """
+        manager = self.get_object()
+
+        try:
+            keys_to_add = int(request.data.get("keys"))
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "keys must be an integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if keys_to_add <= 0:
+            return Response(
+                {"detail": "keys must be a positive integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        manager.total_keys = (manager.total_keys or 0) + keys_to_add
+        manager.save(update_fields=["total_keys"])
+
+        AuditLog.objects.create(
+            manager=manager,
+            action=AuditLog.ACTION_ALLOCATE_KEYS,
+            status=AuditLog.STATUS_SUCCESS,
+            payload={"keys_added": keys_to_add, "new_total": manager.total_keys},
+        )
+
+        return Response(
+            {
+                "detail": f"{keys_to_add} keys allocated.",
+                "manager_id": manager.id,
+                "total_keys": manager.total_keys,
+                "used_keys": manager.used_keys,
+                "keys_remaining": manager.keys_remaining(),
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 class OwnerForceDeleteUserView(APIView):
     """
